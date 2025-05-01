@@ -1,33 +1,18 @@
-#include <functional>
 #include <memory>
 #include <utility>
-
-template <typename Key, typename Compare = std::less<Key>> class RBTree {
-  template <typename, typename> class ESet; // 前向声明
-
+template <typename T> struct DefaultLess {
+  bool operator()(const T &a, const T &b) const { return a < b; }
+};
+template <typename Key, typename Compare = DefaultLess<Key>> class RBTree {
+  // Red-Black Tree implementation
   friend class ESet<Key, Compare>;
 
 private:
-  enum Color { RED, BLACK };
-
-public:
-  struct Node {
-    Key key;
-    Node *parent;
-    Node *left;
-    Node *right;
-    Color color;
-
-    Node(const Key &k)
-        : key(k), parent(nullptr), left(nullptr), right(nullptr), color(RED) {}
-  };
-
   Node *root;
   size_t node_count;
   Compare comp;
 
-private:
-  // 左旋
+  // Left rotate around node x
   void leftRotate(Node *x) {
     Node *y = x->right;
     x->right = y->left;
@@ -44,7 +29,7 @@ private:
     x->parent = y;
   }
 
-  // 右旋
+  // Right rotate around node x
   void rightRotate(Node *x) {
     Node *y = x->left;
     x->left = y->right;
@@ -61,27 +46,31 @@ private:
     x->parent = y;
   }
 
-  // 插入修正，保持红黑树性质
-  void insertFix(Node *z) {
+  // Fix red-black tree properties after insertion of node z
+  void insertFixup(Node *z) {
     while (z->parent && z->parent->color == RED) {
       if (z->parent == z->parent->parent->left) {
         Node *y = z->parent->parent->right;
+        // Case 1: Uncle y is red, recolor and move up the tree
         if (y && y->color == RED) {
           z->parent->color = BLACK;
           y->color = BLACK;
           z->parent->parent->color = RED;
           z = z->parent->parent;
         } else {
+          // Case 2: Uncle y is black and z is right child, rotate left
           if (z == z->parent->right) {
             z = z->parent;
             leftRotate(z);
           }
+          // Case 3: Uncle y is black and z is left child, rotate right
           z->parent->color = BLACK;
           z->parent->parent->color = RED;
           rightRotate(z->parent->parent);
         }
       } else {
         Node *y = z->parent->parent->left;
+        // Symmetric cases for right subtree
         if (y && y->color == RED) {
           z->parent->color = BLACK;
           y->color = BLACK;
@@ -101,16 +90,19 @@ private:
     root->color = BLACK;
   }
 
-  void eraseFix(Node *x, Node *x_parent) {
-    while ((x != root) && (!x || x->color == BLACK)) {
+  // Fix red-black tree properties after deletion of a node
+  void eraseFixup(Node *x, Node *x_parent) {
+    while (x != root && (!x || x->color == BLACK)) {
       if (x == (x_parent ? x_parent->left : nullptr)) {
         Node *w = x_parent ? x_parent->right : nullptr;
+        // Case 1: Sibling w is red
         if (w && w->color == RED) {
           w->color = BLACK;
           x_parent->color = RED;
           leftRotate(x_parent);
           w = x_parent->right;
         }
+        // Case 2: Sibling w's children are black
         if ((!w || (!w->left || w->left->color == BLACK) &&
                        (!w->right || w->right->color == BLACK))) {
           if (w)
@@ -118,6 +110,7 @@ private:
           x = x_parent;
           x_parent = x ? x->parent : nullptr;
         } else {
+          // Case 3: Sibling w's right child is black
           if (!w->right || w->right->color == BLACK) {
             if (w->left)
               w->left->color = BLACK;
@@ -126,6 +119,7 @@ private:
             rightRotate(w);
             w = x_parent ? x_parent->right : nullptr;
           }
+          // Case 4: Sibling w's right child is red
           if (w)
             w->color = x_parent->color;
           if (x_parent)
@@ -134,10 +128,10 @@ private:
             w->right->color = BLACK;
           leftRotate(x_parent);
           x = root;
-          break;
         }
       } else {
         Node *w = x_parent ? x_parent->left : nullptr;
+        // Symmetric cases for right child
         if (w && w->color == RED) {
           w->color = BLACK;
           x_parent->color = RED;
@@ -167,7 +161,6 @@ private:
             w->left->color = BLACK;
           rightRotate(x_parent);
           x = root;
-          break;
         }
       }
     }
@@ -175,11 +168,35 @@ private:
       x->color = BLACK;
   }
 
+  // Deep copy of the tree starting from node x, with parent p
+  Node *copyTree(Node *x, Node *p) {
+    if (!x)
+      return nullptr;
+    Node *new_node = new Node(x->key, p, nullptr, nullptr, x->color);
+    new_node->left = copyTree(x->left, new_node);
+    new_node->right = copyTree(x->right, new_node);
+    return new_node;
+  }
+
 public:
   RBTree() : root(nullptr), node_count(0), comp(Compare()) {}
   ~RBTree() { clear(root); }
 
-  // 移动构造
+  RBTree(const RBTree &other) : root(nullptr), node_count(0), comp(other.comp) {
+    root = copyTree(other.root, nullptr);
+    node_count = other.node_count;
+  }
+
+  RBTree &operator=(const RBTree &other) {
+    if (this != &other) {
+      clear(root);
+      root = copyTree(other.root, nullptr);
+      node_count = other.node_count;
+      comp = other.comp;
+    }
+    return *this;
+  }
+
   RBTree(RBTree &&other) noexcept
       : root(other.root), node_count(other.node_count),
         comp(std::move(other.comp)) {
@@ -187,10 +204,9 @@ public:
     other.node_count = 0;
   }
 
-  // 移动赋值
   RBTree &operator=(RBTree &&other) noexcept {
     if (this != &other) {
-      clear(root); // 释放当前树
+      clear(root);
       root = other.root;
       node_count = other.node_count;
       comp = std::move(other.comp);
@@ -200,7 +216,54 @@ public:
     return *this;
   }
 
-  // 插入操作
+  // Recursively delete all nodes in the subtree rooted at x
+  void clear(Node *x) {
+    if (!x)
+      return;
+    clear(x->left);
+    clear(x->right);
+    delete x;
+  }
+
+  // Return the minimum node in subtree rooted at x
+  Node *minimum(Node *x) const {
+    while (x && x->left)
+      x = x->left;
+    return x;
+  }
+
+  // Return the maximum node in subtree rooted at x
+  Node *maximum(Node *x) const {
+    while (x && x->right)
+      x = x->right;
+    return x;
+  }
+
+  // Return the successor of node x in in-order traversal
+  Node *successor(Node *x) const {
+    if (x->right)
+      return minimum(x->right);
+    Node *y = x->parent;
+    while (y && x == y->right) {
+      x = y;
+      y = y->parent;
+    }
+    return y;
+  }
+
+  // Return the predecessor of node x in in-order traversal
+  Node *predecessor(Node *x) const {
+    if (x->left)
+      return maximum(x->left);
+    Node *y = x->parent;
+    while (y && x == y->left) {
+      x = y;
+      y = y->parent;
+    }
+    return y;
+  }
+
+  // Insert key into the tree, return pair of node and insertion success
   std::pair<Node *, bool> insert(const Key &key) {
     Node *y = nullptr;
     Node *x = root;
@@ -211,25 +274,35 @@ public:
       else if (comp(x->key, key))
         x = x->right;
       else
-        return {x, false}; // 元素已存在
+        return {x, false};
     }
-    Node *z = new Node(key);
-    z->parent = y;
+
+    Node *z = new Node(key, y, nullptr, nullptr, RED);
     if (!y)
       root = z;
     else if (comp(z->key, y->key))
       y->left = z;
     else
       y->right = z;
-    insertFix(z);
+
+    insertFixup(z);
     ++node_count;
     return {z, true};
   }
 
-  bool erase(const Key &key) {
-    Node *z = find(key);
+  // Erase node with given key, return number of nodes erased (0 or 1)
+  size_t erase(const Key &key) {
+    Node *z = root;
+    while (z) {
+      if (comp(key, z->key))
+        z = z->left;
+      else if (comp(z->key, key))
+        z = z->right;
+      else
+        break;
+    }
     if (!z)
-      return false;
+      return 0;
 
     Node *y = z;
     Node *x = nullptr;
@@ -293,11 +366,12 @@ public:
     --node_count;
 
     if (y_original_color == BLACK)
-      eraseFix(x, x_parent);
+      eraseFixup(x, x_parent);
 
-    return true;
-  };
+    return 1;
+  }
 
+  // Find node with given key or return nullptr
   Node *find(const Key &key) const {
     Node *x = root;
     while (x) {
@@ -309,42 +383,9 @@ public:
         return x;
     }
     return nullptr;
-  };
-
-  Node *minimum(Node *x) const {
-    while (x && x->left)
-      x = x->left;
-    return x;
   }
 
-  Node *maximum(Node *x) const {
-    while (x && x->right)
-      x = x->right;
-    return x;
-  }
-
-  Node *successor(Node *node) const {
-    if (node->right)
-      return minimum(node->right);
-    Node *y = node->parent;
-    while (y && node == y->right) {
-      node = y;
-      y = y->parent;
-    }
-    return y;
-  }
-
-  Node *predecessor(Node *node) const {
-    if (node->left)
-      return maximum(node->left);
-    Node *y = node->parent;
-    while (y && node == y->left) {
-      node = y;
-      y = y->parent;
-    }
-    return y;
-  }
-
+  // Find node with smallest key >= given key
   Node *lower_bound(const Key &key) const {
     Node *x = root;
     Node *res = nullptr;
@@ -357,8 +398,9 @@ public:
       }
     }
     return res;
-  };
+  }
 
+  // Find node with smallest key > given key
   Node *upper_bound(const Key &key) const {
     Node *x = root;
     Node *res = nullptr;
@@ -371,17 +413,8 @@ public:
       }
     }
     return res;
-  };
-
-  size_t size() const noexcept { return node_count; }
-  bool empty() const noexcept { return node_count == 0; }
-
-  // Clear all nodes recursively
-  void clear(Node *node) {
-    if (!node)
-      return;
-    clear(node->left);
-    clear(node->right);
-    delete node;
   }
+
+  size_t size() const { return node_count; }
+  Node *getRoot() const { return root; }
 };
