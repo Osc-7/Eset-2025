@@ -2,6 +2,7 @@ test/
 main*
 .vscode/
 .gitignore
+test1.dSYM/
 graph.py
 figures/
 *.txt
