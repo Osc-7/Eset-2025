@@ -2,7 +2,6 @@ test/
 main*
 .vscode/
 .gitignore
-test1*
 graph.py
 figures/
 *.txt

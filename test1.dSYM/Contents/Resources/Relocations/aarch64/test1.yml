@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/osc7/Codes/Eset/Eset-2025/test1'
+relocations:     []
+...
