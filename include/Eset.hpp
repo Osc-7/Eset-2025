@@ -17,6 +17,7 @@ template <class Key, class Compare = DefaultLess<Key>> class ESet {
 private:
   enum Color { RED, BLACK };
 
+public:
   // Node structure for red-black tree
   struct Node {
     Key key;
@@ -30,6 +31,7 @@ private:
         : key(k), parent(p), left(l), right(r), color(c) {}
   };
 
+private:
   // Red-Black Tree implementation
   class RBTree {
     friend class ESet<Key, Compare>;
@@ -39,6 +41,7 @@ private:
     size_t node_count;
     Compare comp;
 
+  protected:
     // Left rotate around node x
     void leftRotate(Node *x) {
       Node *y = x->right;
@@ -73,6 +76,7 @@ private:
       x->parent = y;
     }
 
+  private:
     // Fix red-black tree properties after insertion of node z
     void insertFixup(Node *z) {
       while (z->parent && z->parent->color == RED) {
@@ -254,21 +258,21 @@ private:
     }
 
     // Return the minimum node in subtree rooted at x
-    Node *minimum(Node *x) const {
+    __attribute__((always_inline)) inline Node *minimum(Node *x) const {
       while (x && x->left)
         x = x->left;
       return x;
     }
 
     // Return the maximum node in subtree rooted at x
-    Node *maximum(Node *x) const {
+    __attribute__((always_inline)) inline Node *maximum(Node *x) const {
       while (x && x->right)
         x = x->right;
       return x;
     }
 
     // Return the successor of node x in in-order traversal
-    Node *successor(Node *x) const {
+    __attribute__((always_inline)) inline Node *successor(Node *x) const {
       if (x->right)
         return minimum(x->right);
       Node *y = x->parent;
@@ -280,7 +284,7 @@ private:
     }
 
     // Return the predecessor of node x in in-order traversal
-    Node *predecessor(Node *x) const {
+    __attribute__((always_inline)) inline Node *predecessor(Node *x) const {
       if (x->left)
         return maximum(x->left);
       Node *y = x->parent;
@@ -292,7 +296,8 @@ private:
     }
 
     // Insert key into the tree, return pair of node and insertion success
-    std::pair<Node *, bool> insert(const Key &key) {
+    __attribute__((always_inline)) inline std::pair<Node *, bool>
+    insert(const Key &key) {
       Node *y = nullptr;
       Node *x = root;
       while (x) {
@@ -319,7 +324,7 @@ private:
     }
 
     // Erase node with given key, return number of nodes erased (0 or 1)
-    size_t erase(const Key &key) {
+    __attribute__((always_inline)) inline size_t erase(const Key &key) {
       Node *z = root;
       while (z) {
         if (comp(key, z->key))
@@ -400,7 +405,7 @@ private:
     }
 
     // Find node with given key or return nullptr
-    Node *find(const Key &key) const {
+    __attribute__((always_inline)) inline Node *find(const Key &key) const {
       Node *x = root;
       while (x) {
         if (comp(key, x->key))
@@ -414,7 +419,8 @@ private:
     }
 
     // Find node with smallest key >= given key
-    Node *lower_bound(const Key &key) const {
+    __attribute__((always_inline)) inline Node *
+    lower_bound(const Key &key) const {
       Node *x = root;
       Node *res = nullptr;
       while (x) {
@@ -429,7 +435,8 @@ private:
     }
 
     // Find node with smallest key > given key
-    Node *upper_bound(const Key &key) const {
+    __attribute__((always_inline)) inline Node *
+    upper_bound(const Key &key) const {
       Node *x = root;
       Node *res = nullptr;
       while (x) {
@@ -443,8 +450,10 @@ private:
       return res;
     }
 
-    size_t size() const { return node_count; }
-    Node *getRoot() const { return root; }
+    __attribute__((always_inline)) inline size_t size() const {
+      return node_count;
+    }
+    __attribute__((always_inline)) inline Node *getRoot() const { return root; }
   };
 
   RBTree tree;
@@ -460,26 +469,26 @@ public:
     const_iterator(const RBTree *t = nullptr, Node *n = nullptr)
         : tree(t), node(n) {}
 
-    const Key &operator*() const {
+    __attribute__((always_inline)) inline const Key &operator*() const {
       if (!node)
         throw std::out_of_range("dereferencing end iterator");
       return node->key;
     }
 
-    const_iterator &operator++() {
+    __attribute__((always_inline)) inline const_iterator &operator++() {
       if (!node)
         return *this;
       node = tree->successor(node);
       return *this;
     }
 
-    const_iterator operator++(int) {
+    __attribute__((always_inline)) inline const_iterator operator++(int) {
       const_iterator tmp = *this;
       ++(*this);
       return tmp;
     }
 
-    const_iterator &operator--() {
+    __attribute__((always_inline)) inline const_iterator &operator--() {
       if (!node) {
         if (!tree || !tree->getRoot())
           return *this;
@@ -492,7 +501,7 @@ public:
       return *this;
     }
 
-    const_iterator operator--(int) {
+    __attribute__((always_inline)) inline const_iterator operator--(int) {
       const_iterator tmp = *this;
       --(*this);
       return tmp;
@@ -537,7 +546,9 @@ public:
   }
 
   // Erase element by key, returns number of elements erased (0 or 1)
-  size_t erase(const Key &key) { return tree.erase(key); }
+  __attribute__((always_inline)) inline size_t erase(const Key &key) {
+    return tree.erase(key);
+  }
 
   // Clear all elements from the set
   void clear() {
@@ -547,7 +558,7 @@ public:
   }
 
   // Find element by key, return iterator to element or end()
-  iterator find(const Key &key) const {
+  __attribute__((always_inline)) inline iterator find(const Key &key) const {
     return iterator(&tree, tree.find(key));
   }
 
@@ -564,25 +575,35 @@ public:
     return cnt;
   }
 
-  size_t size() const noexcept { return tree.size(); }
+  __attribute__((always_inline)) inline size_t size() const noexcept {
+    return tree.size();
+  }
 
   // Return iterator to first element not less than key
-  iterator lower_bound(const Key &key) const {
+  __attribute__((always_inline)) inline iterator
+  lower_bound(const Key &key) const {
     return iterator(&tree, tree.lower_bound(key));
   }
 
   // Return iterator to first element greater than key
-  iterator upper_bound(const Key &key) const {
+  __attribute__((always_inline)) inline iterator
+  upper_bound(const Key &key) const {
     return iterator(&tree, tree.upper_bound(key));
   }
 
   // Return iterator to smallest element
-  iterator begin() const noexcept {
+  __attribute__((always_inline)) inline iterator begin() const noexcept {
     return iterator(&tree, tree.minimum(tree.getRoot()));
   }
 
   // Return iterator to end (past last element)
-  iterator end() const noexcept { return iterator(&tree, nullptr); }
+  __attribute__((always_inline)) inline iterator end() const noexcept {
+    return iterator(&tree, nullptr);
+  }
+
+  __attribute__((always_inline)) inline Node *getRoot() const {
+    return tree.getRoot();
+  }
 };
 
 #endif

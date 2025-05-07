@@ -2,7 +2,11 @@ test/
 main*
 .vscode/
 .gitignore
-test1.dSYM/
+*.dSYM/
 graph.py
 figures/
 *.txt
+test*
+*.sh
+*.py
+compare_test/
