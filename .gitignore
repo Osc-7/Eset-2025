@@ -10,3 +10,7 @@ test*
 *.sh
 *.py
 compare_test/
+*PASS
+PASS*
+*.in
+*.out
